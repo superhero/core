@@ -1,0 +1,27 @@
+{
+  "name": "@superhero/core",
+  "version": "4.0.0-beta.1",
+  "description": "Core functionalities for the superhero framework.",
+  "main": "index.js",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "dependencies": {
+    "@superhero/bootstrap": "^4.0.0",
+    "@superhero/config": "^4.0.5",
+    "@superhero/locator": "^4.0.4"
+  },
+  "scripts": {
+    "test": "node --trace-warnings --test --experimental-test-coverage"
+  },
+  "author": {
+    "name": "Erik Landvall",
+    "email": "erik@landvall.se"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/superhero/config"
+  }
+}
