@@ -1,6 +1,6 @@
 {
   "name": "@superhero/core",
-  "version": "4.0.0-beta.3",
+  "version": "4.0.0-beta.4",
   "description": "Core functionalities for the superhero framework.",
   "main": "index.js",
   "license": "MIT",
@@ -22,6 +22,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/superhero/config"
+    "url": "https://github.com/superhero/core"
   }
 }
