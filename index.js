@@ -3,7 +3,7 @@ import cluster      from 'node:cluster'
 import EventEmitter from 'node:events'
 import bootstrap    from '@superhero/bootstrap'
 import Config       from '@superhero/config'
-import { Locate }   from '@superhero/locator'
+import Locate       from '@superhero/locator'
 
 export default class Core
 {
