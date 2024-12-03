@@ -1,7 +1,10 @@
 import assert from 'node:assert'
 import fs     from 'node:fs/promises'
 import Core   from '@superhero/core'
+import util   from 'node:util'
 import { before, after, suite, test } from 'node:test'
+
+util.inspect.defaultOptions.depth = 5
 
 suite('@superhero/core', () =>
 {
@@ -21,7 +24,7 @@ suite('@superhero/core', () =>
     await fs.writeFile(fooService, 'export default class Foo { static locate() { return new Foo() } bootstrap(config) { this.bar = config.bar } }')
 
     // Create mock config files
-    await fs.writeFile(fooConfig,     JSON.stringify({ foo: { bar: 'baz' }, bootstrap: { foo: true }, locator: { 'foo': fooService } }))
+    await fs.writeFile(fooConfig,     JSON.stringify({ foo: { bar: 'baz' }, bootstrap: { foo: true }, locator: { foo: './service.js' } }))
     await fs.writeFile(fooConfigDev,  JSON.stringify({ foo: { bar: 'qux' } }))
 
     // Disable console output for the tests

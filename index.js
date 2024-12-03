@@ -1,6 +1,7 @@
 import os           from 'node:os'
 import cluster      from 'node:cluster'
 import EventEmitter from 'node:events'
+import path         from 'node:path'
 import bootstrap    from '@superhero/bootstrap'
 import Config       from '@superhero/config'
 import Locate       from '@superhero/locator'
@@ -19,27 +20,6 @@ export default class Core
     this.basePath = this.locate.pathResolver.basePath // synchronize the base path.
     this.locate.set('@superhero/config', this.config)
     Core.#setupDestructor(this)
-  }
-
-  static log(template, ...args)
-  {
-    const
-      dim   = '\x1b[1m\x1b[90m\x1b[2m',
-      color = '\x1b[90m',
-      mark  = '\x1b[2m\x1b[96m',
-      reset = '\x1b[0m',
-      label = process.env.CORE_CLUSTER_WORKER
-            ? `[CORE:${process.env.CORE_CLUSTER_WORKER}]`
-            : '[CORE]',
-      icon  = ' ⇢ ',
-      write = console._stdout.write.bind(console._stdout),
-      build = template.reduce((result, part, i) => 
-      {
-        const arg = args[i - 1] ?? ''
-        return result + mark + arg + reset + color + part
-      })
-
-    return write(reset + dim + label + icon + reset + color + build + reset + '\n')
   }
 
   #branch
@@ -100,14 +80,14 @@ export default class Core
   {
     if(Core.#destructorIsTriggered)
     {
-      Core.log`Redundant shutdown signal, waiting for the shutdown process to finalize…`
-      reason && console.error(reason)
+      Core.log.info`redundant shutdown signal ${signal} waiting for previous shutdown process to finalize…`
+      reason && Core.log.error(reason)
       return
     }
 
     Core.#destructorIsTriggered = true
 
-    signal && Core.log`${signal} ⇢ Graceful shutdown initiated…`
+    signal && Core.log.info`${signal} ⇢ graceful shutdown initiated…`
 
     const
       destructCores   = [],
@@ -135,12 +115,12 @@ export default class Core
       const error = new Error('Failed to shutdown gracefully')
       error.code  = 'E_CORE_DESTRUCT_GRACEFUL'
       error.cause = destructRejects
-      console.error(error)
+      Core.log.error(error)
       setImmediate(() => process.exit(1))
     }
     else if(reason)
     {
-      console.error(reason)
+      Core.log.error(reason)
       setImmediate(() => process.exit(1))
     }
     else
@@ -292,15 +272,16 @@ export default class Core
     }
     else if(false === this.#isBooted)
     {
-      await this.#addDependencies()
+      await this.#confirmAndAddDependencies()
+      await this.#confirmAbsoluteServcieMapPaths()
 
       freeze && this.config.freeze()
-  
+
       const locatorMap = this.config.find('locator')
       locatorMap && await this.locate.eagerload(locatorMap)
   
       const bootstrapMap = this.config.find('bootstrap')
-      bootstrapMap && await bootstrap.bootstrap(bootstrapMap, this.config, this.locate)
+      bootstrapMap && await bootstrap(bootstrapMap, this.config, this.locate)
 
       this.#isBooted = true
     }
@@ -348,7 +329,7 @@ export default class Core
       this.#workers[forkId].once('exit', this.#reloadWorker.bind(this, forkId, forkBranch, forkVersion))
       this.#workers[forkId].sync = this.#createSynchoronizer(forkId)
 
-      Core.log`Cluster ${'CORE:' + forkId}`
+      Core.log.info`clustered ${'CORE:' + forkId}`
 
       try
       {
@@ -364,6 +345,44 @@ export default class Core
     }
 
     return branch + forks
+  }
+
+  /**
+   * Eagerload services by the configured locator service map.
+   * 
+   * Resolves the absolute path if any of the services to eagerload is refferencing 
+   * a relative path.
+   * 
+   * Resolves the absolute path by the config entry, through the config instance.
+   */
+  async #confirmAbsoluteServcieMapPaths()
+  {
+    const locatorMap = this.config.find('locator')
+
+    if(locatorMap)
+    {
+      const serviceMap = this.locate.normaliseServiceMap(locatorMap)
+
+      for(const entry in serviceMap)
+      {
+        const servicePath = serviceMap[entry]
+
+        if('string' === typeof servicePath)
+        {
+          if(servicePath.startsWith('.'))
+          {
+            const 
+              configPath    = 'locator/' + entry,
+              absolutePath  = this.config.findAbsoluteDirPathByConfigEntry(configPath, servicePath)
+            
+            if('string' === typeof absolutePath)
+            {
+              serviceMap[entry] = path.normalize(absolutePath + '/' + servicePath)
+            }
+          }
+        }
+      }
+    }
   }
 
   #createSynchoronizer(id)
@@ -497,7 +516,8 @@ export default class Core
   {
     const 
       failedToSynchronize = this.#workers[id].synchronizing,
-      signal_code = signal ? `${signal}:${code}` : code
+      signal_code         = signal ? `${signal}:${code}` : code,
+      label               = `CORE:${id}`
 
     this.#workers[id].removeAllListeners()
     this.#workers[id].kill()
@@ -505,24 +525,24 @@ export default class Core
 
     if(0 === code)
     {
-      Core.log`Worker ${id} finalized!`
+      Core.log.info`${label} ⇣ terminated`
     }
     else if('SIGTERM'  === signal
          || 'SIGINT'   === signal
          || 'SIGQUIT'  === signal)
     {
-      Core.log`Worker ${id} terminated [${signal_code}]`
+      Core.log.info`${label} ⇣ terminated ⇠ ${signal_code}`
     }
     else if(version >= this.config.find('core/cluster/restart/limit', 99))
     {
-      const error = new Error(`Worker ${id} has reached the restart limit`)
+      const error = new Error(`${label} has reached the restart limit`)
       error.code  = 'E_CORE_CLUSTER_RESTART_LIMIT'
-      error.cause = `Worker ${id} terminated after unexpected interruption [${signal_code}]`
+      error.cause = `${label} process crashed ${signal_code}`
       throw error
     }
     else if(failedToSynchronize)
     {
-      const error = new Error(`Worker ${id} failed to synchronize`)
+      const error = new Error(`${label} failed to synchronize`)
       error.code  = 'E_CORE_CLUSTER_SYNC_FAILED'
       throw error
     }
@@ -530,7 +550,7 @@ export default class Core
     {
       try
       {
-        Core.log`Restart worker ${id} after unexpected interruption [${signal_code}]`
+        Core.log.info`restarting ${label} ⇡ previous process crashed ⇠ ${signal_code}`
         await this.cluster(1, branch, version + 1)
       }
       catch(reason)
@@ -546,22 +566,18 @@ export default class Core
   async #addConfigPath(configPath)
   {
     await this.config.add(configPath)
-    Core.log`Assigned config ${configPath}`
+    Core.log.info`assigned config ${configPath}`
 
     if(this.branch)
     {
       try
       {
         await this.config.add(configPath, this.branch)
-        Core.log`Assigned config ${configPath + '-' + this.branch}`
+        Core.log.info`assigned config ${configPath + '-' + this.branch}`
       }
       catch(error)
       {
-        if(error.code === 'E_CONFIG_ADD')
-        {
-          Core.log`Failed to assign config ${configPath}-${this.branch} ⇢ ${error.message}`
-        }
-        else
+        if(error.code !== 'E_CONFIG_ADD')
         {
           throw error
         }
@@ -569,7 +585,7 @@ export default class Core
     }
   }
 
-  async #addDependencies()
+  async #confirmAndAddDependencies()
   {
     const loaded = []
 
@@ -589,19 +605,38 @@ export default class Core
 
   #findNotLodadedDependencies(loaded)
   {
-    const dependencies = this.config.find('dependency')
-
-    if(undefined === dependencies)
-    {
-      return []
-    }
+    const dependencies = this.config.find('core/dependencies', 
+                         this.config.find('core/dependency', []))
 
     if(false === Array.isArray(dependencies))
     {
-      const error = new TypeError(`Invalid dependency type: ${Object.prototype.toString.call(dependencies)}`)
+      const error = new TypeError(`Invalid dependencies type: ${Object.prototype.toString.call(dependencies)}`)
       error.code  = 'E_CORE_CONFIG_DEPENDENCY_INVALID_TYPE'
-      error.cause = 'Config dependency must be an array'
+      error.cause = 'Config core/dependencies must be an array'
       throw error
+    }
+
+    for(let i = 0; i < dependencies.length; i++)
+    {
+      const dependency = dependencies[i]
+
+      if('string' === typeof dependency)
+      {
+        const error = new TypeError(`Invalid dependency type: ${Object.prototype.toString.call(dependency)}`)
+        error.code  = 'E_CORE_CONFIG_DEPENDENCY_INVALID_TYPE'
+        error.cause = 'The dependency values in config core/dependencies must be of type string'
+        throw error
+      }
+
+      if(dependency.startsWith('.'))
+      {
+        const absolutePath = this.config.findAbsoluteDirPathByConfigEntry('core/dependencies', [ dependency ])
+
+        if('string' === typeof absolutePath)
+        {
+          dependencies[i] = path.normalize(absolutePath + '/' + dependency)
+        }
+      }
     }
 
     return dependencies.filter((dependency) => false === loaded.includes(dependency))
@@ -698,5 +733,23 @@ export default class Core
       error.cause = 'Version can not be negative'
       throw error
     }
+  }
+
+  // Will make the log methods availible to overwrite 
+  // if a custom logging is desired.
+  static log =
+  {
+    label   : process.env.CORE_CLUSTER_WORKER
+            ? `[CORE:${process.env.CORE_CLUSTER_WORKER}]`
+            : '[CORE]',
+    icon    : ' ⇢ ',
+    basic   : (template, ...args) => template.reduce((result, part, i) => result + args[i - 1] + part),
+    simple  : (template, ...args) => this.log.label + this.log.icon + this.log.basic(template, ...args),
+    colors  : (template, ...args) => '\x1b[90m' + this.log.supress`${this.log.label + this.log.icon}` + template.reduce((result, part, i) => result + '\x1b[96m\x1b[2m' + args[i - 1] + '\x1b[90m' + part) + '\x1b[0m',
+    supress : (template, ...args) => '\x1b[1m\x1b[2m' + this.log.basic(template, ...args) + '\x1b[22m',
+    format  : (...args) => this.log.colors(...args),
+    info    : (...args) => console.info  (this.log.format(...args)),
+    warning : (...args) => console.warn  (this.log.format(...args)),
+    error   : (...args) => console.error (this.log.format`failure`, ...args)
   }
 }
