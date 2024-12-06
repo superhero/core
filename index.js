@@ -5,6 +5,7 @@ import path         from 'node:path'
 import bootstrap    from '@superhero/bootstrap'
 import Config       from '@superhero/config'
 import Locate       from '@superhero/locator'
+import Log          from '@superhero/log'
 
 export default class Core
 {
@@ -31,7 +32,7 @@ export default class Core
   {
     get: (target, prop, receiver) =>
     {
-      // when pushing events to the eventlog, also send the events to all workers
+      // when pushing events to the eventlog, also sync the event to all workers
       if('push' === prop) return (...events) => 
       {
         setImmediate(() => 
@@ -47,6 +48,9 @@ export default class Core
       return Reflect.get(target, prop, receiver)
     }
   })
+
+  // An exposed log instance taht the core instance uses that is open for modification.
+  static log = new Log({ label: process.env.CORE_CLUSTER_WORKER ? `[CORE:${process.env.CORE_CLUSTER_WORKER}]` : '[CORE]' })
 
   // Used for graceful termination, if multiple cores are instanciated.
   static #cores = new Map
@@ -81,7 +85,7 @@ export default class Core
     if(Core.#destructorIsTriggered)
     {
       Core.log.info`redundant shutdown signal ${signal} waiting for previous shutdown process to finalize…`
-      reason && Core.log.error(reason)
+      reason && Core.log.fail`${reason}`
       return
     }
 
@@ -115,12 +119,12 @@ export default class Core
       const error = new Error('Failed to shutdown gracefully')
       error.code  = 'E_CORE_DESTRUCT_GRACEFUL'
       error.cause = destructRejects
-      Core.log.error(error)
+      Core.log.fail`${error}`
       setImmediate(() => process.exit(1))
     }
     else if(reason)
     {
-      Core.log.error(reason)
+      Core.log.fail`${reason}`
       setImmediate(() => process.exit(1))
     }
     else
@@ -377,7 +381,7 @@ export default class Core
             
             if('string' === typeof absolutePath)
             {
-              serviceMap[entry] = path.normalize(absolutePath + '/' + servicePath)
+              serviceMap[entry] = path.normalize(path.join(absolutePath, servicePath))
             }
           }
         }
@@ -634,7 +638,7 @@ export default class Core
 
         if('string' === typeof absolutePath)
         {
-          dependencies[i] = path.normalize(absolutePath + '/' + dependency)
+          dependencies[i] = path.normalize(path.join(absolutePath, dependency))
         }
       }
     }
@@ -733,23 +737,5 @@ export default class Core
       error.cause = 'Version can not be negative'
       throw error
     }
-  }
-
-  // Will make the log methods availible to overwrite 
-  // if a custom logging is desired.
-  static log =
-  {
-    label   : process.env.CORE_CLUSTER_WORKER
-            ? `[CORE:${process.env.CORE_CLUSTER_WORKER}]`
-            : '[CORE]',
-    icon    : ' ⇢ ',
-    basic   : (template, ...args) => template.reduce((result, part, i) => result + args[i - 1] + part),
-    simple  : (template, ...args) => this.log.label + this.log.icon + this.log.basic(template, ...args),
-    colors  : (template, ...args) => '\x1b[90m' + this.log.supress`${this.log.label + this.log.icon}` + template.reduce((result, part, i) => result + '\x1b[96m\x1b[2m' + args[i - 1] + '\x1b[90m' + part) + '\x1b[0m',
-    supress : (template, ...args) => '\x1b[1m\x1b[2m' + this.log.basic(template, ...args) + '\x1b[22m',
-    format  : (...args) => this.log.colors(...args),
-    info    : (...args) => console.info  (this.log.format(...args)),
-    warning : (...args) => console.warn  (this.log.format(...args)),
-    error   : (...args) => console.error (this.log.format`failure`, ...args)
   }
 }
