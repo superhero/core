@@ -92,6 +92,6 @@ suite('@superhero/core', () =>
       core.bootstrap(),
       'Should bootstrap without errors')
 
-    await core.destruct()
+    await core.destroy()
   })
 })

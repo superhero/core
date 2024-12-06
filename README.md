@@ -44,10 +44,9 @@ await core.bootstrap()
 
 // Locate a service
 const myService = core.locate('myService')
-console.log(myService)
 
 // Graceful shutdown
-await core.destruct()
+await core.destroy()
 ```
 
 ### Clustering Example
@@ -66,8 +65,8 @@ await core.add('./path/to/config.js')
 // Bootstrap core
 await core.bootstrap()
 
-// Destruct core when done
-await core.destruct()
+// Destroy core when done
+await core.destroy()
 ```
 
 ---
@@ -157,7 +156,7 @@ new Core(branch: string = undefined)
 - **`cluster(forks: number, branch?: number, version?: number): Promise<number>`**  
   Start clustering with the specified number of workers.
 
-- **`destruct(): Promise<void>`**  
+- **`destroy(): Promise<void>`**  
   Gracefully shutdown the core, its workers, and services.
 
 #### Properties

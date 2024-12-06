@@ -20,7 +20,7 @@ export default class Core
     this.branch   = branch
     this.basePath = this.locate.pathResolver.basePath // synchronize the base path.
     this.locate.set('@superhero/config', this.config)
-    Core.#setupDestructor(this)
+    Core.#setupDestroyer(this)
   }
 
   #branch
@@ -56,69 +56,71 @@ export default class Core
   static #cores = new Map
 
   // Used to prevent multiple observers on the process events.
-  static #destructorIsSetup = false
+  static #destroyerIsSetup = false
 
-  // Used to prevent multiple destruct calls.
-  static #destructorIsTriggered = false
+  // Used to prevent multiple destroy calls.
+  static #destroyerIsTriggered = false
 
-  static #setupDestructor(core)
+  static #setupDestroyer(core)
   {
     Core.#cores.set(core, core)
 
-    if(false === Core.#destructorIsSetup)
+    if(false === Core.#destroyerIsSetup)
     {
-      Core.#destructorIsSetup = true
+      Core.#destroyerIsSetup = true
 
-      process.on('SIGINT',  (signal) => Core.#destructor(signal))
-      process.on('SIGTERM', (signal) => Core.#destructor(signal))
+      process.on('SIGINT',  (signal) => Core.#destroy(signal))
+      process.on('SIGTERM', (signal) => Core.#destroy(signal))
 
-      process.on('unhandledRejection', (reason) => Core.#destructor(false, reason))
-      process.on('uncaughtException',  (error)  => Core.#destructor(false, error))
+      process.on('unhandledRejection', (reason) => Core.#destroy(false, reason))
+      process.on('uncaughtException',  (error)  => Core.#destroy(false, error))
     }
   }
 
   /**
-   * Attempts to destruct all core instances gracefully.
+   * Attempts to destroy all core instances gracefully.
    */
-  static async #destructor(signal, reason)
+  static async #destroy(signal, reason)
   {
-    if(Core.#destructorIsTriggered)
+    if(Core.#destroyerIsTriggered)
     {
       Core.log.info`redundant shutdown signal ${signal} waiting for previous shutdown process to finalize…`
       reason && Core.log.fail`${reason}`
       return
     }
 
-    Core.#destructorIsTriggered = true
+    Core.#destroyerIsTriggered = true
 
-    signal && Core.log.info`${signal} ⇢ graceful shutdown initiated…`
+    signal
+    ? Core.log.info`graceful shutdown initiated ${signal}`
+    : Core.log.info`graceful shutdown initiated`
 
     const
-      destructCores   = [],
-      destructRejects = []
+      destroyedCores = [],
+      destroyRejects = []
 
     for(const core of Core.#cores.values())
     {
-      destructCores.push((async () => 
+      destroyedCores.push((async () => 
       {
         try
         {
-          await core.destruct()
+          await core.destroy()
         }
         catch(error)
         {
-          destructRejects.push(error)
+          destroyRejects.push(error)
         }
       })())
     }
 
-    await Promise.all(destructCores)
+    await Promise.all(destroyedCores)
 
-    if(destructRejects.length)
+    if(destroyRejects.length)
     {
       const error = new Error('Failed to shutdown gracefully')
-      error.code  = 'E_CORE_DESTRUCT_GRACEFUL'
-      error.cause = destructRejects
+      error.code  = 'E_CORE_DESTROY_GRACEFUL'
+      error.cause = destroyRejects
       Core.log.fail`${error}`
       setImmediate(() => process.exit(1))
     }
@@ -133,25 +135,25 @@ export default class Core
     }
   }
 
-  async destruct()
+  async destroy()
   {
     // First remove the core instance from the static core registry 
-    // to prevent multiple destruct calls.
+    // to prevent multiple destroy calls.
     Core.#cores.delete(this)
 
-    // Then destruct the core workers, if clustered, using a timeout.
+    // Then destroy the core workers, if clustered, using a timeout.
     const
-      timeout         = this.config.find('core/destruct/timeout', 15e3),
-      timeoutError    = new Error(`Failed to destruct core within ${(timeout/1e3).toFixed(1)}s`),
-      destructTimeout = (ctx) => new Promise((_, reject) => ctx.id = setTimeout(() => reject(timeoutError), timeout)),
-      destructWorkers = [],
-      destructRejects = []
+      timeout          = this.config.find('core/destroy/timeout', 15e3),
+      timeoutError     = new Error(`Failed to destroy core within ${(timeout/1e3).toFixed(1)}s`),
+      destroyTimeout   = (ctx) => new Promise((_, reject) => ctx.id = setTimeout(() => reject(timeoutError), timeout)),
+      destroyedWorkers = [],
+      destroyRejects   = []
 
-    timeoutError.code = 'E_CORE_DESTRUCT_TIMEOUT'
+    timeoutError.code = 'E_CORE_DESTROY_TIMEOUT'
 
     for(const id in this.#workers)
     {
-      destructWorkers.push((async () => 
+      destroyedWorkers.push((async () => 
       {
         // Attempt to kill the worker.
         this.#workers[id].kill()
@@ -162,42 +164,42 @@ export default class Core
 
     try
     {
-      if(destructWorkers.length)
+      if(destroyedWorkers.length)
       {
         const timeout = {}
-        await Promise.race([ destructTimeout(timeout), Promise.all(destructWorkers) ])
+        await Promise.race([ destroyTimeout(timeout), Promise.all(destroyedWorkers) ])
         clearTimeout(timeout.id)
       }
     }
     catch(reason)
     {
-      const error = new Error(`Failed to destruct workers`)
-      error.code  = 'E_CORE_DESTRUCT_WORKERS'
+      const error = new Error(`Failed to destroy workers`)
+      error.code  = 'E_CORE_DESTROY_WORKERS'
       error.cause = reason
-      destructRejects.push(error)
+      destroyRejects.push(error)
     }
 
-    // Then destruct the core locator and all loaded services, restricted by a 
+    // Then destroy the core locator and all loaded services, restricted by a 
     // timeout if it takes to long.
     try
     {
       const timeout = {}
-      await Promise.race([ destructTimeout(timeout), this.locate.destruct() ])
+      await Promise.race([ destroyTimeout(timeout), this.locate.destroy() ])
       clearTimeout(timeout.id)
     }
     catch(reason)
     {
-      const error = new Error(`Failed to destruct locator`)
-      error.code  = 'E_CORE_DESTRUCT_LOCATOR'
+      const error = new Error(`Failed to destroy locator`)
+      error.code  = 'E_CORE_DESTROY_LOCATOR'
       error.cause = reason
-      destructRejects.push(error)
+      destroyRejects.push(error)
     }
 
-    if(destructRejects.length)
+    if(destroyRejects.length)
     {
-      const error = new Error(`Failed to destruct core gracefully`)
-      error.code  = 'E_CORE_DESTRUCT'
-      error.cause = destructRejects
+      const error = new Error(`Failed to destroy core gracefully`)
+      error.code  = 'E_CORE_DESTROY'
+      error.cause = destroyRejects
       throw error
     }
   }
@@ -333,7 +335,7 @@ export default class Core
       this.#workers[forkId].once('exit', this.#reloadWorker.bind(this, forkId, forkBranch, forkVersion))
       this.#workers[forkId].sync = this.#createSynchoronizer(forkId)
 
-      Core.log.info`clustered ${'CORE:' + forkId}`
+      Core.log.info`${'CORE:' + forkId} ⇡ clustered`
 
       try
       {
@@ -346,6 +348,8 @@ export default class Core
         error.cause = reason
         throw error
       }
+
+      Core.log.info`synchronized ${'CORE:' + forkId}`
     }
 
     return branch + forks
