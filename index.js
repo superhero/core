@@ -3,14 +3,25 @@ import cluster      from 'node:cluster'
 import EventEmitter from 'node:events'
 import path         from 'node:path'
 import bootstrap    from '@superhero/bootstrap'
-import Config       from '@superhero/config'
 import Locate       from '@superhero/locator'
 import Log          from '@superhero/log'
 
 export default class Core
 {
   locate = new Locate
-  config = new Config
+
+  get config()
+  {
+    return this.locate.config
+  }
+
+  set config(_)
+  {
+    const error = new Error('Can not set the config (read-only) property')
+    error.code  = 'E_CORE_CONFIG_SET'
+    error.cause = 'Alter the config instance through the bundled locator'
+    throw error
+  }
 
   /**
    * @param {string} branch The branch to use to add branch specific configurations.
@@ -19,7 +30,6 @@ export default class Core
   {
     this.branch   = branch
     this.basePath = this.locate.pathResolver.basePath // synchronize the base path.
-    this.locate.set('@superhero/config', this.config)
     Core.#setupDestroyer(this)
   }
 
@@ -214,8 +224,9 @@ export default class Core
 
     // Forward the base path for the scoped path-resolver
     // used by the locator and config services.
+    // OBS! this logic relies on that the locator and config 
+    // services uses the same path-resolver.
     this.locate.pathResolver.basePath = basePath
-    this.config.pathResolver.basePath = basePath
 
     this.#eventlog.push({ type: 'basePath', basePath })
   }
