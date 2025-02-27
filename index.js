@@ -2,6 +2,7 @@ import os           from 'node:os'
 import cluster      from 'node:cluster'
 import EventEmitter from 'node:events'
 import path         from 'node:path'
+import url          from 'node:url'
 import bootstrap    from '@superhero/bootstrap'
 import Locate       from '@superhero/locator'
 import Log          from '@superhero/log'
@@ -331,8 +332,11 @@ export default class Core
     this.#isForked = true
 
     // Set the worker execution script.
-    const primaryConfig = this.config.find('core/cluster/primary', { exec: './worker.js' })
-    cluster.setupPrimary(primaryConfig)
+    const
+      pwd                   = path.dirname(url.fileURLToPath(import.meta.url)),
+      primaryClusterConfig  = this.config.find('core/cluster/primary', { exec: path.join(pwd, 'worker.js') })
+
+    cluster.setupPrimary(primaryClusterConfig)
 
     for(let i = 0; i < forks; i++)
     {
