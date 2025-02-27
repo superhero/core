@@ -290,7 +290,7 @@ export default class Core
     }
     else if(false === this.#isBooted)
     {
-      await this.#confirmAndAddDependencies()
+      await this.#addDependencies()
       await this.#confirmAbsoluteServcieMapPaths()
 
       freeze && this.config.freeze()
@@ -608,61 +608,75 @@ export default class Core
     }
   }
 
-  async #confirmAndAddDependencies()
+  async #addDependencies()
   {
-    const loaded = []
-
-    let postLoaded, dependencies
+    let 
+      dependencies  = {}, 
+      loaded        = []
 
     do
     {
-      dependencies = this.#findNotLodadedDependencies(this.config, loaded)
-      await this.add(dependencies)
-      postLoaded   = this.#findNotLodadedDependencies(this.config, loaded)
-      loaded.push(...postLoaded)
+      loaded = Object.keys(dependencies)
+      dependencies = this.#loadNewDependencies(loaded)
+      await this.add(Object.values(dependencies))
     }
-    while(postLoaded.length)
+    while(Object.keys(dependencies).length < loaded.length)
 
     return this
   }
 
-  #findNotLodadedDependencies(loaded)
+  #loadNewDependencies(loaded)
   {
-    const dependencies = this.config.find('core/dependencies', 
-                         this.config.find('core/dependency', []))
-
-    if(false === Array.isArray(dependencies))
+    const 
+      dependencies     = this.config.find('dependency', {}),
+      dependenciesType = Object.prototype.toString.call(dependencies)
+                
+    if('[object Object]' !== dependenciesType)
     {
-      const error = new TypeError(`Invalid dependencies type: ${Object.prototype.toString.call(dependencies)}`)
-      error.code  = 'E_CORE_CONFIG_DEPENDENCY_INVALID_TYPE'
-      error.cause = 'Config core/dependencies must be an array'
+      const error = new TypeError(`Invalid configured dependency type: ${dependenciesType}`)
+      error.code  = 'E_CORE_INVALID_DEPENDENCY_TYPE'
       throw error
     }
 
-    for(let i = 0; i < dependencies.length; i++)
+    for(const id in dependencies)
     {
-      const dependency = dependencies[i]
-
-      if('string' === typeof dependency)
+      if(loaded.includes(id))
       {
-        const error = new TypeError(`Invalid dependency type: ${Object.prototype.toString.call(dependency)}`)
-        error.code  = 'E_CORE_CONFIG_DEPENDENCY_INVALID_TYPE'
-        error.cause = 'The dependency values in config core/dependencies must be of type string'
+        continue
+      }
+
+      let dependencyPath = dependencies[id]
+
+      if(false === dependencyPath)
+      {
+        continue
+      }
+
+      if(true === path)
+      {
+        dependencyPath = id
+      }
+
+      if('string' !== typeof dependencyPath)
+      {
+        const error = new TypeError(`Invalid dependency path type: ${Object.prototype.toString.call(dependencyPath)}`)
+        error.code  = 'E_CORE_INVALID_DEPENDENCY_PATH_TYPE'
+        error.cause = 'The values of configured dependency attribute must be of type string'
         throw error
       }
 
-      if(dependency.startsWith('.'))
+      if(dependencyPath.startsWith('.'))
       {
-        const absolutePath = this.config.findAbsoluteDirPathByConfigEntry('core/dependencies', [ dependency ])
+        const absolutePath = this.config.findAbsoluteDirPathByConfigEntry('dependency', { [id]: dependencies[id] })
 
         if('string' === typeof absolutePath)
         {
-          dependencies[i] = path.normalize(path.join(absolutePath, dependency))
+          dependencies[i] = path.normalize(path.join(absolutePath, dependencyPath))
         }
       }
     }
 
-    return dependencies.filter((dependency) => false === loaded.includes(dependency))
+    return dependencies
   }
 
   #normalizeConfigPaths(configPaths)
