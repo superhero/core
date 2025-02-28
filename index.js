@@ -652,7 +652,7 @@ export default class Core
         continue
       }
 
-      if(true === path)
+      if(true === dependencyPath)
       {
         dependencyPath = id
       }
