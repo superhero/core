@@ -671,8 +671,18 @@ export default class Core
 
         if('string' === typeof absolutePath)
         {
-          dependencies[i] = path.normalize(path.join(absolutePath, dependencyPath))
+          dependencies[id] = path.normalize(path.join(absolutePath, dependencyPath))
         }
+        else
+        {
+          const error = new Error(`Could not resolve path for dependency "${id}"`)
+          error.code  = 'E_CORE_RESOLVE_DEPENDENCY_PATH'
+          throw error
+        }
+      }
+      else
+      {
+        dependencies[id] = dependencyPath
       }
     }
 
