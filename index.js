@@ -603,7 +603,7 @@ export default class Core
       }
       catch(error)
       {
-        if(error.code !== 'E_CONFIG_ADD')
+        if(error.code !== 'E_CONFIG_RESOLVE')
         {
           throw error
         }

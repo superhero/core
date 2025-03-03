@@ -1,6 +1,6 @@
 {
   "name": "@superhero/core",
-  "version": "4.0.6",
+  "version": "4.0.7",
   "description": "Core functionalities for the superhero framework.",
   "main": "index.js",
   "license": "MIT",
