@@ -290,8 +290,7 @@ export default class Core
     }
     else if(false === this.#isBooted)
     {
-      await this.#addDependencies()
-      await this.#confirmAbsoluteServcieMapPaths()
+      await this.#normalizeServcieMapPaths()
 
       freeze && this.config.freeze()
 
@@ -378,7 +377,7 @@ export default class Core
    * 
    * Resolves the absolute path by the config entry, through the config instance.
    */
-  async #confirmAbsoluteServcieMapPaths()
+  async #normalizeServcieMapPaths()
   {
     const locatorMap = this.config.find('locator')
 
@@ -588,14 +587,18 @@ export default class Core
 
   async #addConfigPath(configPath)
   {
-    await this.config.add(configPath)
+    const { filepath, config } = await this.config.resolve(configPath)
+    this.#addConfigDependencies(filepath, config)
+    this.config.add(filepath, config)
     Core.log.info`assigned config ${configPath}`
 
     if(this.branch)
     {
       try
       {
-        await this.config.add(configPath, this.branch)
+        const { filepath, config } = await this.config.resolve(configPath, this.branch)
+        this.#addConfigDependencies(filepath, config)
+        this.config.add(filepath, config)
         Core.log.info`assigned config ${configPath + '-' + this.branch}`
       }
       catch(error)
@@ -608,28 +611,16 @@ export default class Core
     }
   }
 
-  async #addDependencies()
+  async #addConfigDependencies(parentFilepath, parentConfig)
   {
-    let 
-      dependencies  = {}, 
-      loaded        = []
+    const dependencies = parentConfig.dependency
 
-    do
+    if(false === !!dependencies)
     {
-      loaded = Object.keys(dependencies)
-      dependencies = this.#loadNewDependencies(loaded)
-      await this.add(Object.values(dependencies))
+      return
     }
-    while(Object.keys(dependencies).length < loaded.length)
 
-    return this
-  }
-
-  #loadNewDependencies(loaded)
-  {
-    const 
-      dependencies     = this.config.find('dependency', {}),
-      dependenciesType = Object.prototype.toString.call(dependencies)
+    const dependenciesType = Object.prototype.toString.call(dependencies)
                 
     if('[object Object]' !== dependenciesType)
     {
@@ -640,11 +631,6 @@ export default class Core
 
     for(const id in dependencies)
     {
-      if(loaded.includes(id))
-      {
-        continue
-      }
-
       let dependencyPath = dependencies[id]
 
       if(false === dependencyPath)
@@ -667,26 +653,13 @@ export default class Core
 
       if(dependencyPath.startsWith('.'))
       {
-        const absolutePath = this.config.findAbsoluteDirPathByConfigEntry('dependency', { [id]: dependencies[id] })
+        dependencyPath = path.normalize(path.join(parentFilepath, dependencyPath))
+      }
 
-        if('string' === typeof absolutePath)
-        {
-          dependencies[id] = path.normalize(path.join(absolutePath, dependencyPath))
-        }
-        else
-        {
-          const error = new Error(`Could not resolve path for dependency "${id}"`)
-          error.code  = 'E_CORE_RESOLVE_DEPENDENCY_PATH'
-          throw error
-        }
-      }
-      else
-      {
-        dependencies[id] = dependencyPath
-      }
+      const { filepath, config } = await this.config.resolve(dependencyPath)
+      this.#addConfigDependencies(filepath, config)
+      this.config.add(filepath, config)
     }
-
-    return dependencies
   }
 
   #normalizeConfigPaths(configPaths)
