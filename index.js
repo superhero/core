@@ -133,6 +133,7 @@ export default class Core
       error.code  = 'E_CORE_DESTROY_GRACEFUL'
       error.cause = destroyRejects
       Core.log.fail`${error}`
+      reason && Core.log.fail`${reason}`
       setImmediate(() => process.exit(1))
     }
     else if(reason)
