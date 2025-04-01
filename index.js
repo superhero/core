@@ -589,7 +589,7 @@ export default class Core
   async #addConfigPath(configPath)
   {
     const { filepath, config } = await this.config.resolve(configPath)
-    this.#addConfigDependencies(filepath, config)
+    await this.#addConfigDependencies(filepath, config)
     this.config.add(filepath, config)
     Core.log.info`assigned config ${configPath}`
 
@@ -598,7 +598,7 @@ export default class Core
       try
       {
         const { filepath, config } = await this.config.resolve(configPath, this.branch)
-        this.#addConfigDependencies(filepath, config)
+        await this.#addConfigDependencies(filepath, config)
         this.config.add(filepath, config)
         Core.log.info`assigned config ${configPath + '-' + this.branch}`
       }
@@ -658,7 +658,7 @@ export default class Core
       }
 
       const { filepath, config } = await this.config.resolve(dependencyPath)
-      this.#addConfigDependencies(filepath, config)
+      await this.#addConfigDependencies(filepath, config)
       this.config.add(filepath, config)
     }
   }
