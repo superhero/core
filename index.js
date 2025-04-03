@@ -291,8 +291,6 @@ export default class Core
     }
     else if(false === this.#isBooted)
     {
-      await this.#normalizeServcieMapPaths()
-
       freeze && this.config.freeze()
 
       const locatorMap = this.config.find('locator')
@@ -368,44 +366,6 @@ export default class Core
     }
 
     return branch + forks
-  }
-
-  /**
-   * Eagerload services by the configured locator service map.
-   * 
-   * Resolves the absolute path if any of the services to eagerload is refferencing 
-   * a relative path.
-   * 
-   * Resolves the absolute path by the config entry, through the config instance.
-   */
-  async #normalizeServcieMapPaths()
-  {
-    const locatorMap = this.config.find('locator')
-
-    if(locatorMap)
-    {
-      const serviceMap = this.locate.normaliseServiceMap(locatorMap)
-
-      for(const entry in serviceMap)
-      {
-        const servicePath = serviceMap[entry]
-
-        if('string' === typeof servicePath)
-        {
-          if(servicePath.startsWith('.'))
-          {
-            const 
-              configPath    = 'locator/' + entry,
-              absolutePath  = this.config.findAbsoluteDirPathByConfigEntry(configPath, servicePath)
-            
-            if('string' === typeof absolutePath)
-            {
-              serviceMap[entry] = path.normalize(path.join(absolutePath, servicePath))
-            }
-          }
-        }
-      }
-    }
   }
 
   #createSynchoronizer(id)
