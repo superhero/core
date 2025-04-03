@@ -620,6 +620,7 @@ export default class Core
       const { filepath, config } = await this.config.resolve(dependencyPath)
       await this.#addConfigDependencies(filepath, config)
       this.config.add(filepath, config)
+      Core.log.info`assigned config ${dependencyPath}`
     }
   }
 
