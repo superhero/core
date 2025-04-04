@@ -103,8 +103,8 @@ export default class Core
     Core.#destroyerIsTriggered = true
 
     signal
-    ? Core.log.info`graceful shutdown initiated ${signal}`
-    : Core.log.info`graceful shutdown initiated`
+    ? Core.log.warn`graceful shutdown initiated ${signal}`
+    : Core.log.warn`graceful shutdown initiated`
 
     const
       destroyedCores = [],
@@ -283,6 +283,8 @@ export default class Core
    */
   async bootstrap(freeze = true)
   {
+    Object.assign(Log.default, this.config.find('log'))
+
     if(this.#isForked)
     {
       // If the core is forked, then forward the bootstrap event to all workers
@@ -508,13 +510,13 @@ export default class Core
 
     if(0 === code)
     {
-      Core.log.info`${label} ⇣ terminated`
+      Core.log.warn`${label} ⇣ terminated`
     }
     else if('SIGTERM'  === signal
          || 'SIGINT'   === signal
          || 'SIGQUIT'  === signal)
     {
-      Core.log.info`${label} ⇣ terminated ⇠ ${signal_code}`
+      Core.log.warn`${label} ⇣ terminated ⇠ ${signal_code}`
     }
     else if(version >= this.config.find('core/cluster/restart/limit', 99))
     {
@@ -533,7 +535,7 @@ export default class Core
     {
       try
       {
-        Core.log.info`restarting ${label} ⇡ previous process crashed ⇠ ${signal_code}`
+        Core.log.warn`restarting ${label} ⇡ previous process crashed ⇠ ${signal_code}`
         await this.cluster(1, branch, version + 1)
       }
       catch(reason)
