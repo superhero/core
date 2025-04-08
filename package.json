@@ -1,6 +1,6 @@
 {
   "name": "@superhero/core",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "description": "Core functionalities for the superhero framework.",
   "main": "index.js",
   "license": "MIT",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@superhero/locator": "^4.3.8",
-    "@superhero/bootstrap": "^4.2.0",
+    "@superhero/bootstrap": "^4.2.1",
     "@superhero/log": "^4.0.2"
   },
   "scripts": {
