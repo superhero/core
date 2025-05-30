@@ -283,7 +283,7 @@ export default class Core
    */
   async bootstrap(freeze = true)
   {
-    Object.assign(Log.default, this.config.find('log'))
+    Object.assign(Log.config, this.config.find('log'))
 
     if(this.#isForked)
     {
