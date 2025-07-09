@@ -3,6 +3,7 @@ import cluster      from 'node:cluster'
 import EventEmitter from 'node:events'
 import path         from 'node:path'
 import url          from 'node:url'
+import util         from 'node:util'
 import bootstrap    from '@superhero/bootstrap'
 import Locate       from '@superhero/locator'
 import Log          from '@superhero/log'
@@ -280,8 +281,10 @@ export default class Core
 
   /**
    * Bootstrap the core instance, or the core cluster workers - if the core is clustered.
+   * @param {object} [options]          - Options to pass to the bootstrap process.
+   * @param {boolean} [options.freeze]  - If true, then freezes the config.
    */
-  async bootstrap(freeze = true)
+  async bootstrap(options)
   {
     Object.assign(Log.config, this.config.find('log'))
 
@@ -289,11 +292,13 @@ export default class Core
     {
       // If the core is forked, then forward the bootstrap event to all workers
       // instead of applying the bootstrap process in the primary core instance.
-      this.#eventlog.push({ type: 'bootstrap', freeze })
+      this.#eventlog.push({ type: 'bootstrap', options })
     }
     else if(false === this.#isBooted)
     {
-      freeze && this.config.freeze()
+      options?.freeze && this.config.freeze()
+
+      util.inspect.defaultOptions = this.config.find('util/inspect', util.inspect.defaultOptions)
 
       const locatorMap = this.config.find('locator')
       locatorMap && await this.locate.eagerload(locatorMap)
