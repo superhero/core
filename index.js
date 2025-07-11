@@ -286,7 +286,8 @@ export default class Core
    */
   async bootstrap(options)
   {
-    Object.assign(Log.config, this.config.find('log'))
+    Object.assign(Core.log.config,        this.config.find('core/log'))
+    Object.assign(this.locate.log.config, this.config.find('locator/log'))
 
     if(this.#isForked)
     {
