@@ -1,4 +1,10 @@
 ---
+#### v4.7.11
+---
+
+Improved on the ability to configure the log instance of the  and  components by defining a config at path .
+
+---
 #### v4.7.10
 ---
 
