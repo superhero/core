@@ -1,6 +1,6 @@
 {
   "name": "@superhero/core",
-  "version": "4.7.12",
+  "version": "4.7.13",
   "description": "Core functionalities for the superhero framework.",
   "main": "index.js",
   "license": "MIT",
@@ -13,12 +13,12 @@
     "test": "syntax-check; node --test --test-reporter=@superhero/audit/reporter --experimental-test-coverage"
   },
   "dependencies": {
-    "@superhero/locator": "4.7.12",
-    "@superhero/bootstrap": "4.7.12",
-    "@superhero/log": "4.7.12"
+    "@superhero/locator": "4.7.13",
+    "@superhero/bootstrap": "4.7.13",
+    "@superhero/log": "4.7.13"
   },
   "devDependencies": {
-    "@superhero/audit": "4.7.12",
+    "@superhero/audit": "4.7.13",
     "@superhero/syntax-check": "0.0.2"
   },
   "author": {
